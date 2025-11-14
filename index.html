@@ -97,10 +97,25 @@
                     </div>
                 </div>
 
-                <!-- NEW: Grand Total Credit Box -->
+                <!-- Grand Total Credit Box -->
                 <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
                     <p class="text-sm font-medium text-gray-700">Grand Total Credit (All Customers)</p>
                     <p id="grandTotalBalance" class="text-3xl font-extrabold text-red-600 mt-1">Rs 0.00</p>
+                </div>
+
+                <!-- NEW: Backup & Restore / Export/Import Section -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Backup & Restore</h2>
+                    <button onclick="exportDataAsJson()"
+                            class="w-full bg-green-500 hover:bg-green-600 text-white font-medium py-2 rounded-lg transition duration-150 flex items-center justify-center mb-2">
+                        <span class="material-icons mr-2 text-lg">download</span> Export to JSON
+                    </button>
+                    <!-- Hidden file input for import -->
+                    <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importDataFromUpload(event)">
+                    <button onclick="document.getElementById('importFile').click()"
+                            class="w-full bg-yellow-500 hover:bg-yellow-600 text-white font-medium py-2 rounded-lg transition duration-150 flex items-center justify-center">
+                        <span class="material-icons mr-2 text-lg">upload</span> Import from JSON
+                    </button>
                 </div>
                 
                 <!-- User/App Info (Local Storage Context) -->
@@ -305,10 +320,10 @@
         const addCustomerForm = document.getElementById('addCustomerForm');
         const addTransactionForm = document.getElementById('addTransactionForm');
         
-        // NEW: Grand Total Element
+        // Grand Total Element
         const grandTotalBalanceEl = document.getElementById('grandTotalBalance');
 
-        // NEW: Element for Item Balance Count
+        // Element for Item Balance Count
         const itemBalanceCountEl = document.getElementById('itemBalanceCount');
 
         // Modal Elements
@@ -324,8 +339,8 @@
         const editTransactionForm = document.getElementById('editTransactionForm');
         const editTransactionId = document.getElementById('editTransactionId');
         const editDescription = document.getElementById('editDescription');
-        const editAmountEl = document.getElementById('editAmount'); // Renamed for clarity in script
-        const editCategoryEl = document.getElementById('editCategory'); // Renamed for clarity in script
+        const editAmountEl = document.getElementById('editAmount'); 
+        const editCategoryEl = document.getElementById('editCategory'); 
 
         // Elements for the New Transaction Form
         const transactionCategoryEl = document.getElementById('transactionCategory');
@@ -357,7 +372,7 @@
             editModal.style.display = 'none';
         }
 
-        // --- Toggle Amount Input Logic ---
+        // --- Toggle Amount Input Logic (Item transactions have no PKR amount) ---
         function toggleAmountInput(categorySelect, amountInput) {
             const isItem = categorySelect.value === 'Item';
             if (isItem) {
@@ -416,6 +431,94 @@
                 // Inform user about the saving issue if possible, though a console error suffices here.
             }
         }
+
+        // --- Backup / Export Function (Data download) ---
+        function exportDataAsJson() {
+            // Get the data, convert to JSON string, and pretty print it
+            const dataToExport = JSON.stringify(appData, null, 2); 
+            const blob = new Blob([dataToExport], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create a temporary link element for downloading
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Set file name: ledger-backup-YYYY-MM-DD.json
+            const date = new Date().toISOString().slice(0, 10);
+            a.download = `ledger-backup-${date}.json`;
+            
+            // Programmatically click the link to trigger download
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url); // Clean up
+            
+            showModal("Export Successful", `Ledger data saved as ledger-backup-${date}.json. Keep this file safe!`, "OK");
+        }
+        window.exportDataAsJson = exportDataAsJson; // Expose globally
+
+        // --- Restore / Import Function (Data upload) ---
+        async function importDataFromUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const confirmed = await showModal(
+                "Confirm Data Import",
+                "Are you sure you want to import this data? Current data in your browser will be overwritten.",
+                "Import & Overwrite"
+            );
+
+            if (!confirmed) {
+                // Clear the file input value
+                event.target.value = null; 
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    
+                    // Basic validation to ensure the structure is correct
+                    if (importedData.customers && importedData.transactions) {
+                        // Critical: Update global state and save to local storage
+                        appData = importedData;
+                        // Re-process dates to Date objects if they are strings (important for sorting later)
+                        appData.transactions.forEach(tx => {
+                            if (typeof tx.date === 'string') {
+                                tx.date = new Date(tx.date);
+                            }
+                        });
+                        saveData();
+                        renderCustomers(); // Re-render the UI with new data
+                        
+                        // Select the first customer or reset view if none exist
+                        if (appData.customers.length > 0) {
+                            selectCustomer(appData.customers[0].id);
+                        } else {
+                            selectedCustomerId = null;
+                            customerDetailView.style.display = 'hidden';
+                            noCustomerSelected.style.display = 'block';
+                            renderTransactions(); // Clear transaction view
+                        }
+
+                        // Inform user of success
+                        showModal("Import Successful", "Your data has been successfully imported and saved.", "Got It");
+                    } else {
+                        throw new Error("Invalid file structure. Missing 'customers' or 'transactions' fields.");
+                    }
+                } catch (error) {
+                    console.error("Error processing imported file:", error);
+                    showModal("Import Failed", `Could not import file: ${error.message}. Please check the file format.`, "Close");
+                } finally {
+                    // Clear the file input value
+                    event.target.value = null; 
+                }
+            };
+            reader.readAsText(file);
+        }
+        window.importDataFromUpload = importDataFromUpload; // Expose globally
+
         
         // --- Grand Total Calculation ---
         function calculateGrandTotal() {
@@ -537,7 +640,7 @@
         function renderTransactions() {
             transactionListEl.innerHTML = '';
             let totalBalance = 0;
-            let itemCreditCount = 0; // NEW: Initialize item credit counter
+            let itemCreditCount = 0; // Initialize item credit counter
 
             if (!selectedCustomerId) return;
 
@@ -546,7 +649,7 @@
             if (transactions.length === 0) {
                 transactionListEl.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No transactions recorded yet.</td></tr>';
                 customerBalanceEl.textContent = formatCurrency(0);
-                itemBalanceCountEl.textContent = '0 Items'; // NEW: Reset item balance
+                itemBalanceCountEl.textContent = '0 Items'; // Reset item balance
                 itemBalanceCountEl.className = 'text-4xl font-extrabold text-gray-500 mt-1';
                 return;
             }
@@ -563,7 +666,7 @@
                     totalBalance += amount * sign;
                 }
 
-                // NEW LOGIC: Calculate Item Credits
+                // Logic: Calculate Item Credits
                 if (tx.category === 'Item' && tx.type === 'Credit') {
                     itemCreditCount++;
                 }
@@ -573,7 +676,7 @@
                 const row = document.createElement('tr');
                 row.className = 'hover:bg-gray-50';
                 
-                // Display 'N/A' or '-' if amount is 0 and category is Item, but use the formatted amount otherwise
+                // Display '-' if amount is 0 and category is Item, but use the formatted amount otherwise
                 const amount = parseFloat(tx.amount) || 0; 
                 const amountDisplay = tx.category === 'Item' && amount === 0 ? '-' : formatCurrency(amount);
 
@@ -603,7 +706,7 @@
             customerBalanceEl.textContent = formatCurrency(totalBalance);
             customerBalanceEl.className = `text-4xl font-extrabold mt-1 ${totalBalance >= 0 ? 'text-green-600' : 'text-red-600'}`;
             
-            // NEW: Update Item Balance Count display
+            // Update Item Balance Count display
             itemBalanceCountEl.textContent = `${itemCreditCount} Items`;
             itemBalanceCountEl.className = `text-4xl font-extrabold mt-1 ${itemCreditCount > 0 ? 'text-purple-900' : 'text-gray-500'}`;
         }
