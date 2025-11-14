@@ -20,6 +20,7 @@
             body * {
                 visibility: hidden;
             }
+            /* Make only the print area visible */
             #printArea, #printArea * {
                 visibility: visible;
             }
@@ -45,7 +46,8 @@
                 text-align: left;
             }
             .balance-box {
-                border: 2px solid #3b82f6;
+                /* Use a neutral border color for printing */
+                border: 2px solid #ccc; 
                 padding: 15px;
                 border-radius: 8px;
                 margin-bottom: 20px;
@@ -94,6 +96,12 @@
                         <!-- Customers will be injected here -->
                     </div>
                 </div>
+
+                <!-- NEW: Grand Total Credit Box -->
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                    <p class="text-sm font-medium text-gray-700">Grand Total Credit (All Customers)</p>
+                    <p id="grandTotalBalance" class="text-3xl font-extrabold text-red-600 mt-1">Rs 0.00</p>
+                </div>
                 
                 <!-- User/App Info (Local Storage Context) -->
                 <div class="p-4 text-sm text-gray-500 bg-white rounded-xl shadow-lg">
@@ -108,33 +116,59 @@
             <div class="lg:col-span-3">
                 <div id="customerDetailView" class="hidden">
                     
-                    <!-- Customer Header and Balance -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
-                        <div class="flex justify-between items-start mb-4">
-                            <h2 class="text-3xl font-bold text-gray-800" id="selectedCustomerName"></h2>
-                            <button onclick="printRecord()"
-                                    class="no-print bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-150 flex items-center">
-                                <span class="material-icons mr-2 text-lg">print</span> Print Record
-                            </button>
-                        </div>
-                        
-                        <!-- Balance Display (Updated to a grid layout for two balances) -->
-                        <div class="balance-container grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <!-- Balance Box 1: PKR Balance -->
-                            <div class="balance-box border-b-4 border-blue-500 bg-blue-50 p-4 rounded-lg">
-                                <p class="text-sm font-medium text-blue-700">Current Monetary Balance (PKR)</p>
-                                <p id="customerBalance" class="4xl font-extrabold text-blue-900 mt-1">Rs 0.00</p>
+                    <!-- PRINT AREA START - Content to be printed -->
+                    <div id="printArea">
+                        <!-- Customer Header and Balance -->
+                        <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                            <div class="flex justify-between items-start mb-4">
+                                <h2 class="text-3xl font-bold text-gray-800" id="selectedCustomerName"></h2>
+                                <button onclick="printRecord()"
+                                        class="no-print bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-150 flex items-center">
+                                    <span class="material-icons mr-2 text-lg">print</span> Print Record
+                                </button>
                             </div>
-                            <!-- Balance Box 2: Item Credit Count -->
-                            <div class="balance-box border-b-4 border-purple-500 bg-purple-50 p-4 rounded-lg">
-                                <p class="text-sm font-medium text-purple-700">Outstanding Item Credits</p>
-                                <p id="itemBalanceCount" class="4xl font-extrabold text-purple-900 mt-1">0 Items</p>
+                            
+                            <!-- Balance Display (Updated to a grid layout for two balances) -->
+                            <div class="balance-container grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Balance Box 1: PKR Balance -->
+                                <div class="balance-box border-b-4 border-blue-500 bg-blue-50 p-4 rounded-lg">
+                                    <p class="text-sm font-medium text-blue-700">Current Monetary Balance (PKR)</p>
+                                    <p id="customerBalance" class="4xl font-extrabold text-blue-900 mt-1">Rs 0.00</p>
+                                </div>
+                                <!-- Balance Box 2: Item Credit Count -->
+                                <div class="balance-box border-b-4 border-purple-500 bg-purple-50 p-4 rounded-lg">
+                                    <p class="text-sm font-medium text-purple-700">Outstanding Item Credits</p>
+                                    <p id="itemBalanceCount" class="4xl font-extrabold text-purple-900 mt-1">0 Items</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transaction List -->
+                        <div class="bg-white rounded-xl shadow-lg p-6">
+                            <h3 class="text-xl font-semibold mb-4 text-gray-700">Transaction History</h3>
+                            <div class="overflow-x-auto">
+                                <table id="transactionTable" class="transaction-table min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (PKR)</th>
+                                            <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                            <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transactionList" class="bg-white divide-y divide-gray-200">
+                                        <tr><td colspan="6" class="p-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
+                    <!-- PRINT AREA END -->
 
                     <!-- Add New Transaction Form (no-print) -->
-                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6 no-print">
+                    <div class="bg-white rounded-xl shadow-lg p-6 mt-6 no-print">
                         <h3 class="xl font-semibold mb-4 text-gray-700">Add New Transaction</h3>
                         <form id="addTransactionForm" class="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div class="md:col-span-2">
@@ -171,28 +205,7 @@
                             </div>
                         </form>
                     </div>
-                    
-                    <!-- Transaction List -->
-                    <div class="bg-white rounded-xl shadow-lg p-6">
-                        <h3 class="text-xl font-semibold mb-4 text-gray-700">Transaction History</h3>
-                        <div class="overflow-x-auto">
-                            <table id="transactionTable" class="transaction-table min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (PKR)</th>
-                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="transactionList" class="bg-white divide-y divide-gray-200">
-                                    <tr><td colspan="6" class="p-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+
                 </div>
                 
                 <!-- No Customer Selected Message -->
@@ -291,6 +304,9 @@
         const transactionListEl = document.getElementById('transactionList');
         const addCustomerForm = document.getElementById('addCustomerForm');
         const addTransactionForm = document.getElementById('addTransactionForm');
+        
+        // NEW: Grand Total Element
+        const grandTotalBalanceEl = document.getElementById('grandTotalBalance');
 
         // NEW: Element for Item Balance Count
         const itemBalanceCountEl = document.getElementById('itemBalanceCount');
@@ -392,11 +408,36 @@
                 // We need to convert Date objects to strings for correct JSON serialization
                 const dataToSave = JSON.parse(JSON.stringify(appData));
                 localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(dataToSave));
+                
+                // CRITICAL: Recalculate grand total after any save operation
+                calculateGrandTotal();
             } catch (e) {
                 console.error("Error saving data to Local Storage:", e);
                 // Inform user about the saving issue if possible, though a console error suffices here.
             }
         }
+        
+        // --- Grand Total Calculation ---
+        function calculateGrandTotal() {
+            let totalBalance = 0;
+            appData.transactions.forEach(tx => {
+                // Only consider 'Cash' category for the overall monetary total
+                if (tx.category === 'Cash') {
+                    const amount = parseFloat(tx.amount) || 0; 
+                    const isCredit = tx.type === 'Credit'; // Customer owes money (Asset)
+                    const sign = isCredit ? 1 : -1; // Credit is positive, Debit is negative
+                    totalBalance += amount * sign;
+                }
+            });
+            
+            // Update DOM
+            const balanceText = formatCurrency(totalBalance);
+            grandTotalBalanceEl.textContent = balanceText;
+            
+            // Green for positive (Asset), Red for negative (Liability)
+            grandTotalBalanceEl.className = `text-3xl font-extrabold mt-1 ${totalBalance >= 0 ? 'text-green-600' : 'text-red-600'}`;
+        }
+
 
         // --- Customer Management ---
 
@@ -514,15 +555,16 @@
             transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
 
             transactions.forEach(tx => {
-                // If category is 'Item', the amount stored in the transaction object might be 0 or empty string.
-                // We use the stored amount for calculation and display.
-                const amount = parseFloat(tx.amount) || 0; 
-                const isCredit = tx.type === 'Credit';
-                const sign = isCredit ? 1 : -1;
-                totalBalance += amount * sign;
+                // Only Cash transactions affect the monetary balance
+                if (tx.category === 'Cash') {
+                    const amount = parseFloat(tx.amount) || 0; 
+                    const isCredit = tx.type === 'Credit';
+                    const sign = isCredit ? 1 : -1;
+                    totalBalance += amount * sign;
+                }
 
                 // NEW LOGIC: Calculate Item Credits
-                if (tx.category === 'Item' && isCredit) {
+                if (tx.category === 'Item' && tx.type === 'Credit') {
                     itemCreditCount++;
                 }
 
@@ -532,6 +574,7 @@
                 row.className = 'hover:bg-gray-50';
                 
                 // Display 'N/A' or '-' if amount is 0 and category is Item, but use the formatted amount otherwise
+                const amount = parseFloat(tx.amount) || 0; 
                 const amountDisplay = tx.category === 'Item' && amount === 0 ? '-' : formatCurrency(amount);
 
                 row.innerHTML = `
@@ -540,7 +583,7 @@
                     <td class="px-4 py-3 whitespace-nowrap text-sm ${tx.category === 'Item' ? 'text-purple-600' : 'text-blue-600'}">${tx.category}</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-mono">${amountDisplay}</td>
                     <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold">
-                        <span class="${isCredit ? 'text-red-600' : 'text-green-600'}">${tx.type}</span>
+                        <span class="${tx.type === 'Credit' ? 'text-red-600' : 'text-green-600'}">${tx.type}</span>
                     </td>
                     <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium no-print">
                         <div class="flex space-x-2 justify-center">
@@ -556,9 +599,9 @@
                 transactionListEl.appendChild(row);
             });
 
-            // Update monetary balance
+            // Update monetary balance (using Green for positive balance - asset)
             customerBalanceEl.textContent = formatCurrency(totalBalance);
-            customerBalanceEl.className = `text-4xl font-extrabold mt-1 ${totalBalance >= 0 ? 'text-blue-900' : 'text-red-600'}`;
+            customerBalanceEl.className = `text-4xl font-extrabold mt-1 ${totalBalance >= 0 ? 'text-green-600' : 'text-red-600'}`;
             
             // NEW: Update Item Balance Count display
             itemBalanceCountEl.textContent = `${itemCreditCount} Items`;
@@ -568,7 +611,7 @@
         async function addTransaction(description, amount, category, type) {
             if (!selectedCustomerId) return;
             try {
-                // If category is Item and amount is empty (disabled), save 0.
+                // If category is Item, force amount to 0 for monetary balance calculation.
                 const finalAmount = category === 'Item' ? 0 : parseFloat(amount);
 
                 appData.transactions.push({
@@ -671,7 +714,6 @@
             // Check if amount is required (i.e., Category is 'Cash') and is missing
             if (category === 'Cash' && !amount) {
                  // In case the required attribute is somehow bypassed, show an error.
-                 // Note: We are using a custom modal for confirmations, but sticking to console error here for non-user-facing validation
                  console.error("Please enter an amount for Cash transactions.");
                  return;
             }
@@ -695,7 +737,6 @@
             
             // Check if amount is required and is missing
             if (category === 'Cash' && !amount) {
-                 // Note: We are using a custom modal for confirmations, but sticking to console error here for non-user-facing validation
                  console.error("Please enter an amount for Cash transactions.");
                  return;
             }
@@ -724,6 +765,7 @@
         // --- Main Execution ---
         window.onload = function() {
             loadData(); // Load data from localStorage
+            calculateGrandTotal(); // Initial calculation of grand total
             renderCustomers(); // Start the app by rendering customers
             
             // Set initial state for the Add Transaction form (in case 'Item' is the default option)
