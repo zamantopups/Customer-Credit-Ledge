@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Credit Ledger</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Google Icons for a professional look -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <!-- Load Inter font -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f4f7f9;
+        }
+        /* Custom styles for printing */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printArea, #printArea * {
+                visibility: visible;
+            }
+            #printArea {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                margin: 0;
+                padding: 20px;
+                background: white;
+            }
+            .no-print {
+                display: none !important;
+            }
+            .transaction-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+            .transaction-table th, .transaction-table td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            .balance-box {
+                border: 2px solid #3b82f6;
+                padding: 15px;
+                border-radius: 8px;
+                margin-bottom: 20px;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="app" class="p-4 md:p-8 max-w-7xl mx-auto">
+        <!-- Header -->
+        <header class="mb-8 border-b pb-4 no-print">
+            <h1 class="text-4xl font-extrabold text-blue-600 tracking-tight">Credit Ledger</h1>
+            <p class="text-gray-500">Manage customer credit and accounts securely (Data saved in Local Storage).</p>
+        </header>
+
+        <!-- Loading Indicator (Will be immediately hidden for local storage) -->
+        <div id="loadingIndicator" class="text-center py-10">
+            <div class="flex items-center justify-center space-x-2">
+                <div class="w-4 h-4 rounded-full animate-pulse bg-blue-500"></div>
+                <div class="w-4 h-4 rounded-full animate-pulse bg-blue-500"></div>
+                <div class="w-4 h-4 rounded-full animate-pulse bg-blue-500"></div>
+                <span class="text-lg font-medium text-gray-700 ml-3">Starting... (Local Data Loading)</span>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div id="mainContent" class="hidden grid grid-cols-1 lg:grid-cols-4 gap-8">
+            
+            <!-- Left Panel: Customer Management (1/4 width) -->
+            <div class="lg:col-span-1 no-print">
+                <div class="bg-white rounded-xl shadow-lg p-6 mb-6 sticky top-8">
+                    <h2 class="text-xl font-semibold mb-4 text-gray-700">Customers</h2>
+                    
+                    <!-- Add New Customer Form -->
+                    <form id="addCustomerForm" class="mb-4">
+                        <input type="text" id="newCustomerName" placeholder="New Customer Name" required
+                               class="w-full p-2 border border-gray-300 rounded-lg mb-2 focus:ring-blue-500 focus:border-blue-500">
+                        <button type="submit"
+                                class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 rounded-lg transition duration-150">
+                            Add Customer
+                        </button>
+                    </form>
+
+                    <!-- Customer List -->
+                    <div id="customerList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <!-- Customers will be injected here -->
+                    </div>
+                </div>
+                
+                <!-- User/App Info (Local Storage Context) -->
+                <div class="p-4 text-sm text-gray-500 bg-white rounded-xl shadow-lg">
+                    <p class="font-bold mb-1">Storage Type:</p>
+                    <p class="break-all text-xs text-blue-600">Local Storage (Browser)</p>
+                    <p class="mt-2 font-bold mb-1">App ID:</p>
+                    <p id="currentAppId" class="break-all text-xs">local-storage-mode</p>
+                </div>
+            </div>
+
+            <!-- Right Panel: Transactions and Details (3/4 width) -->
+            <div class="lg:col-span-3">
+                <div id="customerDetailView" class="hidden">
+                    
+                    <!-- Customer Header and Balance -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <h2 class="text-3xl font-bold text-gray-800" id="selectedCustomerName"></h2>
+                            <button onclick="printRecord()"
+                                    class="no-print bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-150 flex items-center">
+                                <span class="material-icons mr-2 text-lg">print</span> Print Record
+                            </button>
+                        </div>
+                        
+                        <!-- Balance Display (Updated to a grid layout for two balances) -->
+                        <div class="balance-container grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Balance Box 1: PKR Balance -->
+                            <div class="balance-box border-b-4 border-blue-500 bg-blue-50 p-4 rounded-lg">
+                                <p class="text-sm font-medium text-blue-700">Current Monetary Balance (PKR)</p>
+                                <p id="customerBalance" class="4xl font-extrabold text-blue-900 mt-1">Rs 0.00</p>
+                            </div>
+                            <!-- Balance Box 2: Item Credit Count -->
+                            <div class="balance-box border-b-4 border-purple-500 bg-purple-50 p-4 rounded-lg">
+                                <p class="text-sm font-medium text-purple-700">Outstanding Item Credits</p>
+                                <p id="itemBalanceCount" class="4xl font-extrabold text-purple-900 mt-1">0 Items</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add New Transaction Form (no-print) -->
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6 no-print">
+                        <h3 class="xl font-semibold mb-4 text-gray-700">Add New Transaction</h3>
+                        <form id="addTransactionForm" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                            <div class="md:col-span-2">
+                                <label for="transactionDescription" class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                                <input type="text" id="transactionDescription" required placeholder="Description (e.g., Sold Item, Cash Payment)"
+                                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="transactionAmount" class="block text-sm font-medium text-gray-700 mb-1">Amount (PKR)</label>
+                                <input type="number" id="transactionAmount" required min="0.01" step="0.01" placeholder="Amount in PKR"
+                                       class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="transactionCategory" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                                <select id="transactionCategory" required
+                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                    <option value="Cash">Cash</option>
+                                    <option value="Item">Item</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="transactionType" class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                <select id="transactionType" required
+                                        class="w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                    <option value="Credit">Credit (Owed by Customer)</option>
+                                    <option value="Debit">Payment (Customer Paid)</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-5 flex justify-end">
+                                <button type="submit"
+                                        class="w-full md:w-auto bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-6 rounded-lg transition duration-150">
+                                    Record Transaction
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Transaction List -->
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-xl font-semibold mb-4 text-gray-700">Transaction History</h3>
+                        <div class="overflow-x-auto">
+                            <table id="transactionTable" class="transaction-table min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Amount (PKR)</th>
+                                        <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider no-print">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transactionList" class="bg-white divide-y divide-gray-200">
+                                    <tr><td colspan="6" class="p-4 text-center text-gray-500">No transactions recorded yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- No Customer Selected Message -->
+                <div id="noCustomerSelected" class="bg-white rounded-xl shadow-lg p-10 text-center">
+                    <span class="material-icons text-6xl text-gray-400 mb-4">group</span>
+                    <h2 class="text-2xl font-semibold text-gray-700">Select a Customer</h2>
+                    <p class="text-gray-500 mt-2">Select a customer from the left panel or add a new one.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Modal/Dialog for Confirmation (No Browser Popups) -->
+        <div id="customModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-lg shadow-2xl w-full max-w-sm p-6 transform transition-all">
+                <h3 class="text-lg font-bold text-gray-800 mb-3" id="modalTitle">Confirm Action</h3>
+                <p class="text-gray-600 mb-6" id="modalMessage">Do you want to confirm this action?</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modalCancel" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition duration-150">
+                        Cancel
+                    </button>
+                    <button id="modalConfirm" class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 font-medium transition duration-150">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Modal/Dialog for Editing Transactions -->
+        <div id="editModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 hidden items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 transform transition-all">
+                <h3 class="text-xl font-bold text-gray-800 mb-4">Edit Transaction</h3>
+                <form id="editTransactionForm" class="space-y-4">
+                    <input type="hidden" id="editTransactionId">
+                    <div>
+                        <label for="editDescription" class="block text-sm font-medium text-gray-700">Description</label>
+                        <input type="text" id="editDescription" required
+                               class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="editAmount" class="block text-sm font-medium text-gray-700">Amount (PKR)</label>
+                        <input type="number" id="editAmount" required min="0.01" step="0.01"
+                               class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="editCategory" class="block text-sm font-medium text-gray-700">Category</label>
+                            <select id="editCategory" required
+                                    class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="Cash">Cash</option>
+                                <option value="Item">Item</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="editType" class="block text-sm font-medium text-gray-700">Type</label>
+                            <select id="editType" required
+                                    class="mt-1 w-full p-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 bg-white">
+                                <option value="Credit">Credit</option>
+                                <option value="Debit">Payment</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="closeEditModal()" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium transition duration-150">
+                            Cancel
+                        </button>
+                        <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium transition duration-150">
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Logic (Using Local Storage) -->
+    <script type="module">
+        // --- Local Storage Configuration ---
+        const APP_STORAGE_KEY = 'creditLedgerData';
+        
+        // Global State variables
+        let appData = {
+            customers: [],
+            transactions: [],
+        };
+        let selectedCustomerId = null;
+
+        // --- DOM Elements ---
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const mainContent = document.getElementById('mainContent');
+        const customerListEl = document.getElementById('customerList');
+        const customerDetailView = document.getElementById('customerDetailView');
+        const noCustomerSelected = document.getElementById('noCustomerSelected');
+        const selectedCustomerNameEl = document.getElementById('selectedCustomerName');
+        const customerBalanceEl = document.getElementById('customerBalance');
+        const transactionListEl = document.getElementById('transactionList');
+        const addCustomerForm = document.getElementById('addCustomerForm');
+        const addTransactionForm = document.getElementById('addTransactionForm');
+
+        // NEW: Element for Item Balance Count
+        const itemBalanceCountEl = document.getElementById('itemBalanceCount');
+
+        // Modal Elements
+        const customModal = document.getElementById('customModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const modalCancel = document.getElementById('modalCancel');
+        const modalConfirm = document.getElementById('modalConfirm');
+        let modalResolve;
+
+        // Edit Modal Elements
+        const editModal = document.getElementById('editModal');
+        const editTransactionForm = document.getElementById('editTransactionForm');
+        const editTransactionId = document.getElementById('editTransactionId');
+        const editDescription = document.getElementById('editDescription');
+        const editAmountEl = document.getElementById('editAmount'); // Renamed for clarity in script
+        const editCategoryEl = document.getElementById('editCategory'); // Renamed for clarity in script
+
+        // Elements for the New Transaction Form
+        const transactionCategoryEl = document.getElementById('transactionCategory');
+        const transactionAmountEl = document.getElementById('transactionAmount');
+
+
+        // --- Custom Modal/Confirmation Handler ---
+        function showModal(title, message, confirmText = 'Confirm') {
+            return new Promise(resolve => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalConfirm.textContent = confirmText;
+                customModal.style.display = 'flex';
+                modalResolve = resolve;
+            });
+        }
+
+        modalCancel.onclick = () => {
+            customModal.style.display = 'none';
+            modalResolve(false);
+        };
+
+        modalConfirm.onclick = () => {
+            customModal.style.display = 'none';
+            modalResolve(true);
+        };
+
+        function closeEditModal() {
+            editModal.style.display = 'none';
+        }
+
+        // --- Toggle Amount Input Logic ---
+        function toggleAmountInput(categorySelect, amountInput) {
+            const isItem = categorySelect.value === 'Item';
+            if (isItem) {
+                amountInput.disabled = true;
+                amountInput.required = false;
+                amountInput.value = ''; // Clear value when disabled
+                // Apply disabled styling
+                amountInput.classList.add('bg-gray-100', 'cursor-not-allowed', 'opacity-75');
+                amountInput.classList.remove('focus:ring-blue-500', 'focus:border-blue-500');
+            } else {
+                amountInput.disabled = false;
+                amountInput.required = true;
+                // Remove disabled styling
+                amountInput.classList.remove('bg-gray-100', 'cursor-not-allowed', 'opacity-75');
+                amountInput.classList.add('focus:ring-blue-500', 'focus:border-blue-500');
+            }
+        }
+
+
+        // --- Local Storage Utility Functions ---
+        function generateUniqueId() {
+            return Date.now().toString(36) + Math.random().toString(36).substring(2);
+        }
+
+        function loadData() {
+            try {
+                const storedData = localStorage.getItem(APP_STORAGE_KEY);
+                if (storedData) {
+                    appData = JSON.parse(storedData);
+                    // Ensure timestamps are preserved for sorting
+                    appData.transactions.forEach(tx => {
+                        if (typeof tx.date === 'string') {
+                            tx.date = new Date(tx.date);
+                        }
+                    });
+                } else {
+                    appData = { customers: [], transactions: [] };
+                }
+            } catch (e) {
+                console.error("Error loading data from Local Storage:", e);
+                // Fail gracefully
+                appData = { customers: [], transactions: [] };
+            }
+        }
+
+        function saveData() {
+            try {
+                // We need to convert Date objects to strings for correct JSON serialization
+                const dataToSave = JSON.parse(JSON.stringify(appData));
+                localStorage.setItem(APP_STORAGE_KEY, JSON.stringify(dataToSave));
+            } catch (e) {
+                console.error("Error saving data to Local Storage:", e);
+                // Inform user about the saving issue if possible, though a console error suffices here.
+            }
+        }
+
+        // --- Customer Management ---
+
+        function renderCustomers() {
+            customerListEl.innerHTML = '';
+            
+            // Re-sort customers by name for presentation
+            const sortedCustomers = [...appData.customers].sort((a, b) => a.name.localeCompare(b.name));
+
+            if (sortedCustomers.length === 0) {
+                customerListEl.innerHTML = '<p class="text-gray-500 text-sm">No customers yet. Add one above.</p>';
+                // If no customers, ensure no customer is selected
+                if (selectedCustomerId) {
+                     selectedCustomerId = null;
+                     customerDetailView.style.display = 'hidden';
+                     noCustomerSelected.style.display = 'block';
+                }
+                return;
+            }
+
+            // Check if selected customer still exists
+            if (selectedCustomerId && !sortedCustomers.some(c => c.id === selectedCustomerId)) {
+                 selectedCustomerId = sortedCustomers[0].id; // Select first if old one is gone
+            } else if (!selectedCustomerId) {
+                selectedCustomerId = sortedCustomers[0].id; // Select the first customer initially
+            }
+            
+            // Render buttons
+            sortedCustomers.forEach(customer => {
+                const isActive = customer.id === selectedCustomerId;
+                const button = document.createElement('button');
+                button.textContent = customer.name;
+                button.className = `w-full text-left p-3 rounded-lg font-medium transition duration-150 ${
+                    isActive
+                        ? 'bg-blue-600 text-white shadow-md'
+                        : 'bg-gray-100 text-gray-700 hover:bg-blue-100 hover:text-blue-700'
+                }`;
+                button.onclick = () => selectCustomer(customer.id);
+                customerListEl.appendChild(button);
+            });
+            
+            // Automatically re-render details for the selected customer
+            if(selectedCustomerId) {
+                selectCustomer(selectedCustomerId, false); // false to prevent re-rendering customer list
+            }
+        }
+
+        async function addCustomer(name) {
+            const trimmedName = name.trim();
+            if (appData.customers.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+                await showModal("Customer Exists", `A customer named "${trimmedName}" already exists.`, "OK");
+                return;
+            }
+
+            appData.customers.push({
+                id: generateUniqueId(),
+                name: trimmedName,
+                created: new Date().toISOString()
+            });
+            saveData();
+            renderCustomers();
+        }
+
+        function selectCustomer(customerId, reRenderList = true) {
+            selectedCustomerId = customerId;
+            const customer = appData.customers.find(c => c.id === customerId);
+
+            if (customer) {
+                selectedCustomerNameEl.textContent = customer.name;
+                customerDetailView.style.display = 'block';
+                noCustomerSelected.style.display = 'none';
+
+                if (reRenderList) {
+                    renderCustomers(); // Update highlighting
+                }
+                
+                renderTransactions();
+            } else {
+                // If customer is null (e.g., deleted), reset view
+                selectedCustomerId = null;
+                customerDetailView.style.display = 'hidden';
+                noCustomerSelected.style.display = 'block';
+            }
+        }
+
+        // --- Transaction Management ---
+
+        function formatCurrency(amount) {
+            // Updated to use Pakistani Rupee (PKR) and 'en-PK' locale
+            return new Intl.NumberFormat('en-PK', {
+                style: 'currency',
+                currency: 'PKR',
+                minimumFractionDigits: 2,
+            }).format(amount);
+        }
+
+        function renderTransactions() {
+            transactionListEl.innerHTML = '';
+            let totalBalance = 0;
+            let itemCreditCount = 0; // NEW: Initialize item credit counter
+
+            if (!selectedCustomerId) return;
+
+            const transactions = appData.transactions.filter(tx => tx.customerId === selectedCustomerId);
+            
+            if (transactions.length === 0) {
+                transactionListEl.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-gray-500">No transactions recorded yet.</td></tr>';
+                customerBalanceEl.textContent = formatCurrency(0);
+                itemBalanceCountEl.textContent = '0 Items'; // NEW: Reset item balance
+                itemBalanceCountEl.className = 'text-4xl font-extrabold text-gray-500 mt-1';
+                return;
+            }
+
+            // Sort transactions by date (newest first)
+            transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            transactions.forEach(tx => {
+                // If category is 'Item', the amount stored in the transaction object might be 0 or empty string.
+                // We use the stored amount for calculation and display.
+                const amount = parseFloat(tx.amount) || 0; 
+                const isCredit = tx.type === 'Credit';
+                const sign = isCredit ? 1 : -1;
+                totalBalance += amount * sign;
+
+                // NEW LOGIC: Calculate Item Credits
+                if (tx.category === 'Item' && isCredit) {
+                    itemCreditCount++;
+                }
+
+                const date = new Date(tx.date).toLocaleDateString();
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                // Display 'N/A' or '-' if amount is 0 and category is Item, but use the formatted amount otherwise
+                const amountDisplay = tx.category === 'Item' && amount === 0 ? '-' : formatCurrency(amount);
+
+                row.innerHTML = `
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">${date}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-900">${tx.description}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm ${tx.category === 'Item' ? 'text-purple-600' : 'text-blue-600'}">${tx.category}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-mono">${amountDisplay}</td>
+                    <td class="px-4 py-3 whitespace-nowrap text-sm text-right font-semibold">
+                        <span class="${isCredit ? 'text-red-600' : 'text-green-600'}">${tx.type}</span>
+                    </td>
+                    <td class="px-4 py-3 whitespace-nowrap text-right text-sm font-medium no-print">
+                        <div class="flex space-x-2 justify-center">
+                            <button class="text-blue-500 hover:text-blue-700 p-1 rounded-full hover:bg-blue-100" title="Edit" data-tx-id="${tx.id}" onclick="openEditModal('${tx.id}', '${tx.description.replace(/'/g, "\\'")}', ${amount}, '${tx.category}', '${tx.type}')">
+                                <span class="material-icons text-base">edit</span>
+                            </button>
+                            <button class="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-100" title="Delete" data-tx-id="${tx.id}" onclick="handleDeleteTransaction('${tx.id}')">
+                                <span class="material-icons text-base">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                transactionListEl.appendChild(row);
+            });
+
+            // Update monetary balance
+            customerBalanceEl.textContent = formatCurrency(totalBalance);
+            customerBalanceEl.className = `text-4xl font-extrabold mt-1 ${totalBalance >= 0 ? 'text-blue-900' : 'text-red-600'}`;
+            
+            // NEW: Update Item Balance Count display
+            itemBalanceCountEl.textContent = `${itemCreditCount} Items`;
+            itemBalanceCountEl.className = `text-4xl font-extrabold mt-1 ${itemCreditCount > 0 ? 'text-purple-900' : 'text-gray-500'}`;
+        }
+
+        async function addTransaction(description, amount, category, type) {
+            if (!selectedCustomerId) return;
+            try {
+                // If category is Item and amount is empty (disabled), save 0.
+                const finalAmount = category === 'Item' ? 0 : parseFloat(amount);
+
+                appData.transactions.push({
+                    id: generateUniqueId(),
+                    customerId: selectedCustomerId,
+                    description: description.trim(),
+                    amount: finalAmount,
+                    category: category, 
+                    type: type, 
+                    date: new Date().toISOString() // Save as ISO string for date persistence
+                });
+                
+                saveData();
+                renderTransactions();
+                
+                // Clear form after successful submission
+                addTransactionForm.reset();
+                document.getElementById('transactionDescription').focus();
+                // Ensure the amount input is reset to the correct state (enabled for 'Cash' which is default)
+                toggleAmountInput(transactionCategoryEl, transactionAmountEl);
+
+            } catch (error) {
+                console.error("Error while adding transaction:", error);
+            }
+        }
+
+        async function editTransaction(id, description, amount, category, type) {
+            try {
+                const index = appData.transactions.findIndex(tx => tx.id === id);
+                if (index !== -1) {
+                    // If category is Item, force amount to 0 (or null, but 0 is safer for calculation)
+                    const finalAmount = category === 'Item' ? 0 : parseFloat(amount);
+
+                    appData.transactions[index].description = description.trim();
+                    appData.transactions[index].amount = finalAmount;
+                    appData.transactions[index].category = category;
+                    appData.transactions[index].type = type;
+                    
+                    saveData();
+                    renderTransactions();
+                    closeEditModal();
+                }
+            } catch (error) {
+                console.error("Error while updating transaction:", error);
+            }
+        }
+
+        async function handleDeleteTransaction(id) {
+            const confirmed = await showModal(
+                "Delete Transaction",
+                "Are you sure you want to permanently delete this transaction? This action cannot be undone.",
+                "Delete"
+            );
+
+            if (confirmed) {
+                try {
+                    const initialLength = appData.transactions.length;
+                    appData.transactions = appData.transactions.filter(tx => tx.id !== id);
+                    if (appData.transactions.length < initialLength) {
+                        saveData();
+                        renderTransactions();
+                    }
+                } catch (error) {
+                    console.error("Error while deleting transaction:", error);
+                }
+            }
+        }
+
+        window.openEditModal = (id, description, amount, category, type) => {
+            editTransactionId.value = id;
+            editDescription.value = description;
+            
+            // Set amount to 0 if category is Item and amount is null/undefined to avoid errors, otherwise use the value.
+            editAmountEl.value = amount || 0; 
+            
+            editCategoryEl.value = category;
+            
+            // IMPORTANT: Call the toggle function immediately when modal opens
+            toggleAmountInput(editCategoryEl, editAmountEl); 
+            
+            editModal.style.display = 'flex';
+        }
+
+        // --- Event Listeners ---
+        addCustomerForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('newCustomerName');
+            if (input.value) {
+                addCustomer(input.value);
+                input.value = '';
+            }
+        });
+
+        addTransactionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const description = document.getElementById('transactionDescription').value;
+            const amount = document.getElementById('transactionAmount').value;
+            const category = document.getElementById('transactionCategory').value;
+            const type = document.getElementById('transactionType').value;
+            // Check if amount is required (i.e., Category is 'Cash') and is missing
+            if (category === 'Cash' && !amount) {
+                 // In case the required attribute is somehow bypassed, show an error.
+                 // Note: We are using a custom modal for confirmations, but sticking to console error here for non-user-facing validation
+                 console.error("Please enter an amount for Cash transactions.");
+                 return;
+            }
+            if (description) {
+                addTransaction(description, amount, category, type);
+            }
+        });
+        
+        // Listener for the new transaction form
+        transactionCategoryEl.addEventListener('change', () => {
+            toggleAmountInput(transactionCategoryEl, transactionAmountEl);
+        });
+
+        editTransactionForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const id = editTransactionId.value;
+            const description = editDescription.value;
+            const amount = editAmountEl.value;
+            const category = editCategoryEl.value;
+            const type = document.getElementById('editType').value;
+            
+            // Check if amount is required and is missing
+            if (category === 'Cash' && !amount) {
+                 // Note: We are using a custom modal for confirmations, but sticking to console error here for non-user-facing validation
+                 console.error("Please enter an amount for Cash transactions.");
+                 return;
+            }
+
+            editTransaction(id, description, amount, category, type);
+        });
+        
+        // Listener for the edit transaction form
+        editCategoryEl.addEventListener('change', () => {
+            toggleAmountInput(editCategoryEl, editAmountEl);
+        });
+
+        
+        // Expose functions globally for HTML event handlers
+        window.printRecord = () => {
+             // Use the browser's native print function
+             window.print();
+        }
+
+        window.handleDeleteTransaction = handleDeleteTransaction;
+        window.openEditModal = openEditModal;
+        window.closeEditModal = closeEditModal;
+        window.selectCustomer = selectCustomer;
+
+
+        // --- Main Execution ---
+        window.onload = function() {
+            loadData(); // Load data from localStorage
+            renderCustomers(); // Start the app by rendering customers
+            
+            // Set initial state for the Add Transaction form (in case 'Item' is the default option)
+            toggleAmountInput(transactionCategoryEl, transactionAmountEl);
+            
+            // Hide loading indicator immediately since local storage is fast
+            loadingIndicator.style.display = 'none';
+            mainContent.style.display = 'grid';
+            
+            // Set App ID placeholder text
+            document.getElementById('currentAppId').textContent = "LOCAL_STORAGE_MODE";
+        };
+
+    </script>
+</body>
+</html>
