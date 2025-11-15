@@ -136,7 +136,17 @@
                         <!-- Customer Header and Balance -->
                         <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
                             <div class="flex justify-between items-start mb-4">
-                                <h2 class="text-3xl font-bold text-gray-800" id="selectedCustomerName"></h2>
+                                <!-- Customer Name and Delete Button Group (UPDATED) -->
+                                <div class="flex items-center space-x-3">
+                                    <h2 class="text-3xl font-bold text-gray-800" id="selectedCustomerName"></h2>
+                                    <!-- NEW: Delete Customer Button -->
+                                    <button id="deleteCustomerBtn" onclick="handleDeleteCustomer()"
+                                            class="no-print p-2 rounded-full text-red-500 hover:bg-red-100 transition duration-150"
+                                            title="Delete Customer & All Data">
+                                        <span class="material-icons text-xl">delete_forever</span>
+                                    </button>
+                                </div>
+                                <!-- Print Button -->
                                 <button onclick="printRecord()"
                                         class="no-print bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition duration-150 flex items-center">
                                     <span class="material-icons mr-2 text-lg">print</span> Print Record
@@ -325,6 +335,9 @@
 
         // Element for Item Balance Count
         const itemBalanceCountEl = document.getElementById('itemBalanceCount');
+
+        // NEW: Delete Customer Button Element
+        const deleteCustomerBtn = document.getElementById('deleteCustomerBtn');
 
         // Modal Elements
         const customModal = document.getElementById('customModal');
@@ -625,6 +638,48 @@
                 noCustomerSelected.style.display = 'block';
             }
         }
+
+        // NEW: Handle Customer and associated transaction deletion
+        async function handleDeleteCustomer() {
+            if (!selectedCustomerId) return;
+
+            const customer = appData.customers.find(c => c.id === selectedCustomerId);
+            if (!customer) return;
+
+            const confirmed = await showModal(
+                "Delete Customer & Data",
+                `Are you sure you want to permanently delete customer "${customer.name}" and ALL their transactions? This action cannot be undone.`,
+                "Delete Permanently"
+            );
+
+            if (confirmed) {
+                try {
+                    // 1. Remove customer
+                    appData.customers = appData.customers.filter(c => c.id !== selectedCustomerId);
+
+                    // 2. Remove associated transactions
+                    appData.transactions = appData.transactions.filter(tx => tx.customerId !== selectedCustomerId);
+
+                    // 3. Save changes
+                    saveData();
+
+                    // 4. Reset view and re-render
+                    selectedCustomerId = null;
+                    renderCustomers(); // Renders customer list and selects the next one if available, or resets view
+                    
+                    // Explicitly reset detail view if no customers remain
+                    if (appData.customers.length === 0) {
+                         customerDetailView.style.display = 'hidden';
+                         noCustomerSelected.style.display = 'block';
+                    }
+
+                } catch (error) {
+                    console.error("Error while deleting customer and transactions:", error);
+                    showModal("Deletion Failed", "An error occurred while deleting the customer.", "Close");
+                }
+            }
+        }
+        window.handleDeleteCustomer = handleDeleteCustomer; // Expose globally
 
         // --- Transaction Management ---
 
